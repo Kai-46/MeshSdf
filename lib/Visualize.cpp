@@ -3,6 +3,8 @@
 #include "Visualize.h"
 #include "DataStructs.h"
 #include <boost/multi_array.hpp>
+#include <iostream>
+#include <fstream>
 
 using namespace std;
 
@@ -55,7 +57,10 @@ boost::gil::rgb8_image_t MeshSdf::ColorCodedSlice(
 	using namespace boost::gil;
 	boost::multi_array<double, 2> sds{ boost::extents[imHeight][imWidth] };
 
-	auto z = bbox.zmin + depthPercent*(bbox.zmax - bbox.zmin);
+	// auto z = bbox.zmin + depthPercent*(bbox.zmax - bbox.zmin);
+
+	auto z = depthPercent;
+	// std::cout << "Computing SDF slice for z= " << z << '\n';
 
 	#pragma omp parallel for schedule(dynamic,1)
 	for (auto r = 0; r < imHeight; ++r)
@@ -73,6 +78,26 @@ boost::gil::rgb8_image_t MeshSdf::ColorCodedSlice(
 	auto minsd = *itminsd;
 	auto maxsd = *itmaxsd;
 
+	std::cout << "min, max: " << minsd << ", " << maxsd << '\n';
+
+	// write to file
+	std::cout << "Writing to file...\n";
+	std::ofstream myfile;
+	myfile.open("./sdf_slice.txt");
+	for (auto r = 0; r < imHeight; ++r)
+	{
+		for (auto c = 0; c < imWidth; ++c)
+		{
+			myfile << float(sds[r][c]);
+			if (c < imWidth - 1) {
+				myfile << ",";
+			}
+		}
+		myfile << "\n";
+	}
+	myfile.close();
+
+	// convert to color map
 	auto const Eps0 = (maxsd - minsd) / 512 * 2;
 
 	rgb8_image_t img(imWidth, imHeight);
@@ -88,12 +113,16 @@ boost::gil::rgb8_image_t MeshSdf::ColorCodedSlice(
 			else if (sds[r][c] > Eps0)
 			{
 				auto i = static_cast<unsigned char>(clamp((1.0 - sds[r][c] / maxsd) * 255, 0.0, 255.0));
-				view(img)(c,r) = { 0, 0, i };
+				// view(img)(c,r) = { 0, 0, i };
+				view(img)(c,r) = { i, 0, 0 };
+
 			}
 			else if (sds[r][c] < -Eps0)
 			{
 				auto i = static_cast<unsigned char>(clamp((1.0 - sds[r][c] / minsd) * 255, 0.0, 255.0));
-				view(img)(c,r) = { 0, i, 0 };
+				// view(img)(c,r) = { 0, i, 0 };
+				view(img)(c,r) = { 0, 0, i };
+
 			}
 		}
 	}

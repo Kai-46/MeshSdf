@@ -1,2 +1,5 @@
 bin
 meshes
+build
+.DS_Store
+
